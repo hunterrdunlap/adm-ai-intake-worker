@@ -1,0 +1,20 @@
+# wrangler.toml
+name = "ai-intake" # This will be part of your worker's URL, e.g., ai-intake.<YOUR_ACCOUNT>.workers.dev
+main = "src/index.js"
+compatibility_date = "2025-05-09" # Use the date provided or a more recent one
+
+[vars]
+# OPENAI_KEY will be set as a secret, not directly here.
+# This 'dummy' value here is just a placeholder and won't be used if the secret is set.
+# OPENAI_KEY = "dummy_this_will_be_overridden_by_secret"
+
+# If you are NOT using a custom domain with Cloudflare DNS yet,
+# you can comment out or remove the [triggers] section for initial deployment.
+# The worker will then be available at https://ai-intake.<YOUR_SUBDOMAIN>.workers.dev
+#
+# [triggers]
+# # Replace 'yourdomain.com' with your actual domain if you have one configured in Cloudflare
+# # and want to route traffic from a specific path on that domain to this worker.
+# routes = [
+#   { pattern = "yourdomain.com/summarize", zone_name = "yourdomain.com" }
+# ]

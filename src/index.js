@@ -90,7 +90,7 @@ export default {
           "Authorization": `Bearer ${env.OPENAI_KEY}`,
         },
         body: JSON.stringify({
-          model: "gpt-4o",
+          model: "gpt-4.1",
           messages: [{ role: "user", content: prompt }],
           temperature: 0.3,
           response_format: { type: "json_object" }
@@ -182,7 +182,7 @@ export default {
           "Authorization": `Bearer ${env.OPENAI_KEY}`,
         },
         body: JSON.stringify({
-          model: "gpt-4o",
+          model: "gpt-4.1",
           messages: [{ role: "user", content: prompt }],
           temperature: 0.5, 
           // No response_format needed, as we want plain text

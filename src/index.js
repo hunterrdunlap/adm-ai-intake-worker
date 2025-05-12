@@ -145,20 +145,45 @@ export default {
     try {
       const { sessionId, chat, answers } = await request.json();
   
-      const prompt = `
-  Create a professional summary of this AI idea interview in two paragraphs, then output:
-  ---
-  Business Unit: [Infer most likely business unit]
-  Category (tag): [Categorize the idea - e.g., Automation, Analytics, NLP, Computer Vision, etc.]
-  Urgency (high/med/low): [Assess urgency based on timeline and business need]
-  ---
-  
-  Conversation history:
-  ${chat.map(m => `${m.role}: ${m.text}`).join('\n')}
-  
-  Answers collected:
-  ${JSON.stringify(answers, null, 2)}
-  `;
+      const prompt = `You are an AI assistant helping collect information about AI project ideas. Your job is to:
+
+1. Extract answers to specific questions from the user's messages.
+2. Determine which question should be focused on next.
+3. Generate a conversational response that feels natural.
+
+Current state:
+- Answered questions (text only): ${answeredQuestions.map(q => q.text).join(', ') || 'None yet'}
+- Unanswered questions (text only): ${unansweredQuestions.map(q => q.text).join(', ') || 'All questions appear to have some answer.'}
+
+User's message: "${message}"
+
+Recent conversation history:
+${history.slice(-6).map(h => `${h.role}: ${h.text}`).join('\n')}
+
+Questions to address (IMPORTANT: In your "extractedAnswers" JSON response, you MUST use the 'key_for_json' value shown for each question below as the actual key in the JSON object, for example, 'businessProblem', 'targetUsers'):
+${questions.map(q => `- Question: "${q.text}" (key_for_json: '${q.key}', id_for_focus: '${q.id}')`).join('\n')}
+
+Current answers already collected by the system (These are for your context to understand what has been gathered. Your 'extractedAnswers' for the current user message must still use the 'key_for_json' from the list above):
+${JSON.stringify(answers, null, 2)}
+
+Please respond with a JSON object strictly adhering to this structure:
+{
+  "extractedAnswers": {
+    // IMPORTANT: Keys in this object MUST be the 'key_for_json' values specified in "Questions to address" (e.g., "businessProblem": "extracted answer...", "targetUsers": "extracted answer...").
+    // Only include answers that can be clearly extracted from the LATEST user message. If no answer for a specific key is in the latest message, do not include that key.
+  },
+  "response": "Your conversational response to the user. Acknowledge their input and, if appropriate, ask the next logical question or guide them.",
+  "currentFocus": "The 'id_for_focus' of the next most important UNANSWERED question (e.g., 'problem', 'users'). This should be one of the 'id_for_focus' values from the 'Questions to address' list.",
+  "allAnswered": boolean // Set to true if you believe, based on the conversation and extracted answers, that all questions in the "Questions to address" list now have a satisfactory answer. Otherwise, set to false.
+}
+
+Guidelines:
+- Be conversational and natural.
+- Do not list questions mechanically in your response.
+- If multiple questions can be answered from one user message, extract all of them using their respective 'key_for_json'.
+- Focus on the most important unanswered question when determining 'currentFocus'.
+- Acknowledge what the user shared before asking the next question.
+- If the user provides vague answers, politely ask for more detail.`;
   
       const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",

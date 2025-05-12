@@ -145,45 +145,15 @@ export default {
     try {
       const { sessionId, chat, answers } = await request.json();
   
-      const prompt = `You are an AI assistant helping collect information about AI project ideas. Your job is to:
-
-1. Extract answers to specific questions from the user's messages.
-2. Determine which question should be focused on next.
-3. Generate a conversational response that feels natural.
-
-Current state:
-- Answered questions (text only): ${answeredQuestions.map(q => q.text).join(', ') || 'None yet'}
-- Unanswered questions (text only): ${unansweredQuestions.map(q => q.text).join(', ') || 'All questions appear to have some answer.'}
-
-User's message: "${message}"
-
-Recent conversation history:
-${history.slice(-6).map(h => `${h.role}: ${h.text}`).join('\n')}
-
-Questions to address (IMPORTANT: In your "extractedAnswers" JSON response, you MUST use the 'key_for_json' value shown for each question below as the actual key in the JSON object, for example, 'businessProblem', 'targetUsers'):
-${questions.map(q => `- Question: "${q.text}" (key_for_json: '${q.key}', id_for_focus: '${q.id}')`).join('\n')}
-
-Current answers already collected by the system (These are for your context to understand what has been gathered. Your 'extractedAnswers' for the current user message must still use the 'key_for_json' from the list above):
-${JSON.stringify(answers, null, 2)}
-
-Please respond with a JSON object strictly adhering to this structure:
-{
-  "extractedAnswers": {
-    // IMPORTANT: Keys in this object MUST be the 'key_for_json' values specified in "Questions to address" (e.g., "businessProblem": "extracted answer...", "targetUsers": "extracted answer...").
-    // Only include answers that can be clearly extracted from the LATEST user message. If no answer for a specific key is in the latest message, do not include that key.
-  },
-  "response": "Your conversational response to the user. Acknowledge their input and, if appropriate, ask the next logical question or guide them.",
-  "currentFocus": "The 'id_for_focus' of the next most important UNANSWERED question (e.g., 'problem', 'users'). This should be one of the 'id_for_focus' values from the 'Questions to address' list.",
-  "allAnswered": boolean // Set to true if you believe, based on the conversation and extracted answers, that all questions in the "Questions to address" list now have a satisfactory answer. Otherwise, set to false.
-}
-
-Guidelines:
-- Be conversational and natural.
-- Do not list questions mechanically in your response.
-- If multiple questions can be answered from one user message, extract all of them using their respective 'key_for_json'.
-- Focus on the most important unanswered question when determining 'currentFocus'.
-- Acknowledge what the user shared before asking the next question.
-- If the user provides vague answers, politely ask for more detail.`;
+      // Prepare a summarized version of the chat history for the prompt
+      const chatHistorySummary = chat.slice(-10).map(h => `${h.role}: ${h.text}`).join('\n');
+  
+      let prompt = "You are an AI assistant. Based on the following collected answers and a snippet of the conversation history about an AI project idea, please generate a concise and coherent narrative summary of the project.\n\n";
+      prompt += "Collected Answers:\n";
+      prompt += JSON.stringify(answers, null, 2) + "\n\n";
+      prompt += "Conversation History (last 10 messages):\n";
+      prompt += chatHistorySummary + "\n\n";
+      prompt += "Please provide a narrative summary of the AI project idea. Output only the summary text itself, without any leading phrases like \"Here's the summary:\".";
   
       const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -194,16 +164,27 @@ Guidelines:
         body: JSON.stringify({
           model: "gpt-4o",
           messages: [{ role: "user", content: prompt }],
+          temperature: 0.5, 
+          // No response_format needed, as we want plain text
         }),
       });
   
       if (!openaiResponse.ok) {
-        throw new Error(`OpenAI API error: ${openaiResponse.status}`);
+        const errorBody = await openaiResponse.text(); // Get more details on the error
+        console.error(`OpenAI API error during summarize: ${openaiResponse.status} ${openaiResponse.statusText}`, errorBody);
+        throw new Error(`OpenAI API error: ${openaiResponse.status} ${openaiResponse.statusText}`);
       }
   
       const data = await openaiResponse.json();
       
-      return new Response(JSON.stringify({ summary: data.choices[0].message.content }), {
+      if (!data.choices || !data.choices[0] || !data.choices[0].message || typeof data.choices[0].message.content !== 'string') {
+        console.error('Unexpected OpenAI response structure:', data);
+        throw new Error('Failed to get summary from OpenAI response.');
+      }
+      
+      const summaryText = data.choices[0].message.content;
+  
+      return new Response(JSON.stringify({ summary: summaryText }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });

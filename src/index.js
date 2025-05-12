@@ -89,22 +89,30 @@ export default {
         body: JSON.stringify({
           model: "gpt-4o",
           messages: [{ role: "user", content: prompt }],
-          temperature: 0.7,
+          temperature: 0.3,
+          response_format: { type: "json_object" }
         }),
       });
   
       if (!openaiResponse.ok) {
-        throw new Error(`OpenAI API error: ${openaiResponse.status}`);
+        const errorBody = await openaiResponse.text();
+        console.error(`OpenAI API error: ${openaiResponse.status} ${openaiResponse.statusText}`, errorBody);
+        throw new Error(`OpenAI API error: ${openaiResponse.status} ${openaiResponse.statusText}`);
       }
   
       const data = await openaiResponse.json();
       const assistantResponse = data.choices[0].message.content;
       
+      // It's still a good idea to log the raw response when debugging
+      console.log("Raw OpenAI Response (should be JSON):", assistantResponse);
+
       // Parse the JSON response
       let parsedResponse;
       try {
         parsedResponse = JSON.parse(assistantResponse);
       } catch (e) {
+        console.error('Failed to parse OpenAI JSON response:', e);
+        console.error('Raw response that failed parsing:', assistantResponse);
         // Fallback if JSON parsing fails
         parsedResponse = {
           extractedAnswers: {},

@@ -4,7 +4,15 @@ main = "src/index.js"
 compatibility_date = "2025-05-09" # Use the date provided or a more recent one
 
 [[routes]]
-pattern = "admagent2025.com/*"
+pattern = "admagent2025.com/summarize"
+zone_name = "admagent2025.com"
+
+[[routes]]
+pattern = "admagent2025.com/process"
+zone_name = "admagent2025.com"
+
+[[routes]]
+pattern = "admagent2025.com/store-idea"
 zone_name = "admagent2025.com"
 
 [vars]

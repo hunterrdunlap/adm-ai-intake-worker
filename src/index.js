@@ -243,7 +243,7 @@ export default {
           dataSources_text, dataSources_quality,
           unintendedOutcomes_text, unintendedOutcomes_quality,
           aiCandidacy_text, aiCandidacy_quality
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       `;
 
       // Prepare the values for binding

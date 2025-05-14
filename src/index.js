@@ -34,7 +34,7 @@ export default {
   
   async function handleProcess(request, env, corsHeaders) {
     try {
-      const { sessionId, message, history, answers, questions } = await request.json();
+      const { sessionId, clockId, message, history, answers, questions } = await request.json();
   
       // Create a dynamic prompt based on current state
       const answeredQuestions = questions.filter(q => answers[q.key] && answers[q.key].text);
@@ -45,7 +45,7 @@ export default {
   1. Extract answers to specific questions from the user's messages.
   2. For each extracted answer, provide a quality score from 1 to 5 (1=very poor, 5=excellent).
   3. Determine which question should be focused on next.
-  4. Generate a conversational response that feels natural. If an answer's quality is below 3, your response should aim to get more detailed information for that specific question.
+  4. Generate a concise response. Ask the next most relevant unanswered question. If an answer's quality for a *previously answered question* is < 3, your response should aim to get more detailed information for *that specific question* instead of moving to a new one. Do not repeat the user's previous message or offer preamble like 'Okay, I understand that...'.
   
   Current state:
   - Answered questions: ${answeredQuestions.map(q => `${q.text} (Quality: ${answers[q.key] ? answers[q.key].quality : 'N/A'})`).join(', ')}
@@ -62,6 +62,8 @@ export default {
   Current answers (with quality scores):
   ${JSON.stringify(answers, null, 2)}
   
+  Clock ID of the user: ${clockId}
+  
   Please respond with a JSON object containing:
   {
     "extractedAnswers": {
@@ -70,18 +72,18 @@ export default {
       // Only include answers that can be clearly extracted from the current message.
       // If one user message contains answers for MULTIPLE questions, extract ALL of them.
     },
-    "response": "Your conversational response to the user. If any answer quality < 3, ask for more detail on that topic.",
+    "response": "Your concise response to the user. Directly ask the next most relevant unanswered question. If an answer's quality for a *previously answered question* is < 3, ask for more specific detail on that topic instead of moving to a new question. Do not repeat the user's previous message or offer preamble like 'Okay, I understand that...'.",
     "currentFocus": "question_id of the next question to focus on (can be a low-quality one for clarification)",
     "allAnswered": boolean indicating if all questions have been answered with sufficient quality (e.g., quality >= 3)
   }
   
   Guidelines:
-  - Be conversational and natural.
+  - Be direct and to the point in your responses.
   - Don't list questions mechanically.
   - If multiple questions can be answered from one message, extract all of them with their quality.
-  - Focus on the most important unanswered question OR a question that needs clarification due to low quality.
-  - Acknowledge what the user shared before asking the next question or seeking clarification.
-  - If the user provides vague answers, assign a lower quality score and politely ask for more detail.`;
+  - Focus on the most important unanswered question OR a question that needs clarification due to low quality. If clarifying, be specific about what additional detail is needed.
+  - Do NOT acknowledge or repeat what the user just said. Directly ask the next question or ask for clarification concisely.
+  - If the user provides vague answers, assign a lower quality score and politely ask for more specific detail for that question.`;
   
       const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -156,12 +158,13 @@ export default {
   
   async function handleSummarize(request, env, corsHeaders) {
     try {
-      const { sessionId, chat, answers } = await request.json(); // answers is now { key: {text, quality} }
+      const { sessionId, clockId, chat, answers } = await request.json();
   
       // Prepare a summarized version of the chat history for the prompt
       const chatHistorySummary = chat.slice(-10).map(h => `${h.role}: ${h.text}`).join('\n');
   
       let prompt = "You are an AI assistant. Based on the following collected answers (text and quality) and a snippet of the conversation history about an AI project idea, please generate a concise and coherent narrative summary of the project. Focus on the content of the answers.\n\n";
+      prompt += `User Clock ID: ${clockId}\n`;
       prompt += "Collected Answers:\n";
       // Extract text from answers for the prompt
       const answersForPrompt = {};
@@ -220,35 +223,96 @@ export default {
   
   async function handleStoreIdea(request, env, corsHeaders) {
     try {
-      const { sessionId, answers, history, summary } = await request.json(); // answers now include quality
-      
-      // Here you would integrate with your storage solution
-      // For now, we'll just log it and return success
-      console.log('Storing idea (with quality):', { // Updated log
-        sessionId,
-        answers, // This now includes { text: "...", quality: X }
-        timestamp: new Date().toISOString(),
-        summary
+      const { sessionId, clockId, answers, summary } = await request.json(); // Removed 'history' as it's not stored
+
+      // Define the question keys in the order they appear in your CREATE TABLE statement
+      // This ensures the bindings are correct.
+      const questionKeys = [
+        'taskToImprove', 'currentProcess', 'timeEffort', 'benefitingTeam',
+        'successMeasurement', 'dataSources', 'unintendedOutcomes', 'aiCandidacy'
+      ];
+
+      const sql = `
+        INSERT INTO project_ideas (
+          sessionId, clockId, summary,
+          taskToImprove_text, taskToImprove_quality,
+          currentProcess_text, currentProcess_quality,
+          timeEffort_text, timeEffort_quality,
+          benefitingTeam_text, benefitingTeam_quality,
+          successMeasurement_text, successMeasurement_quality,
+          dataSources_text, dataSources_quality,
+          unintendedOutcomes_text, unintendedOutcomes_quality,
+          aiCandidacy_text, aiCandidacy_quality
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+      `;
+
+      // Prepare the values for binding
+      // The order must match the '?' placeholders in the SQL statement
+      const bindings = [
+        sessionId,          // sessionId
+        clockId,            // clockId
+        summary             // summary
+      ];
+
+      questionKeys.forEach(key => {
+        const answer = answers[key];
+        bindings.push(answer && answer.text ? answer.text : null);         // _text
+        bindings.push(answer && typeof answer.quality === 'number' ? answer.quality : null); // _quality
       });
-  
-      // You could integrate with:
-      // - Airtable API
-      // - Google Sheets API
-      // - Cloudflare D1 database
-      // - Supabase
-      // - Or any other storage service
-  
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: 'Idea stored successfully' 
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-  
+
+      // Ensure we have the correct number of bindings
+      // 1 (sessionId) + 1 (clockId) + 1 (summary) + 8 questions * 2 fields/question = 3 + 16 = 19 expected after summary
+      // Total placeholders: 2 (session, clock) + 1 (summary) + 16 (questions) = 19 in total.
+      // My SQL has 20 '?' placeholders, 1 for sessionId, 1 for clockId, 1 for summary, then 16 for questions (8*2)
+      // No, the SQL has: sessionId, clockId, summary (3) + 8*2 = 16. Total = 19 placeholders.
+      // My values array: sessionId, clockId, summary (3) + 8*2 = 16. Total = 19.
+      // Correcting the SQL above. It should be 19 placeholders.
+      // sessionId, clockId, summary,
+      // q1_text, q1_quality,
+      // q2_text, q2_quality,
+      // ...
+      // q8_text, q8_quality
+      // SQL has: 1 (sessionId) + 1 (clockId) + 1 (summary) + 8*2 (16 for questions) = 19 placeholders.
+      // The bindings array starts with 3 elements and then adds 16. So, 19 total. This matches.
+
+      // console.log('Attempting to store idea with D1. Bindings:', bindings);
+      // console.log('Number of bindings:', bindings.length);
+
+      const stmt = env.DB.prepare(sql).bind(...bindings);
+      const { success, error } = await stmt.run();
+
+      if (success) {
+        console.log('Idea stored successfully in D1:', { sessionId, clockId });
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'Idea stored successfully'
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } else {
+        console.error('Failed to store idea in D1:', error, { sessionId, clockId });
+        return new Response(JSON.stringify({
+          success: false,
+          message: 'Failed to store idea in database.',
+          error: error || 'Unknown D1 error'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
     } catch (error) {
-      console.error('Error storing idea:', error);
-      return new Response(JSON.stringify({ error: error.message }), {
+      console.error('Error in handleStoreIdea function:', error);
+      // Check if it's a D1 specific error structure or general error
+      const errorMessage = error.message || (error.cause ? error.cause.message : 'Internal server error');
+      const errorStack = error.stack || '';
+      console.error('Full error details:', { errorMessage, errorStack, cause: error.cause });
+
+      return new Response(JSON.stringify({
+        error: 'An error occurred while attempting to store the idea.',
+        detail: errorMessage
+      }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });

@@ -15,6 +15,11 @@ zone_name = "admagent2025.com"
 pattern = "admagent2025.com/store-idea"
 zone_name = "admagent2025.com"
 
+[[d1_databases]]
+binding = "DB"
+database_name = "adm-ai-ideas-db"
+database_id = "8c18f48a-5c7b-4171-8d96-266b09dc2893"
+
 [vars]
 # OPENAI_KEY will be set as a secret, not directly here.
 # This 'dummy' value here is just a placeholder and won't be used if the secret is set.

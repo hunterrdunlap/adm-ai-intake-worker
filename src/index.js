@@ -24,6 +24,10 @@ export default {
       if (url.pathname === '/store-idea' && request.method === 'POST') {
         return handleStoreIdea(request, env, corsHeaders);
       }
+
+      if (url.pathname === '/admin/data' && request.method === 'GET') {
+        return handleAdminData(request, env, corsHeaders);
+      }
   
       return new Response(JSON.stringify({ error: "Not found" }), {
         status: 404,
@@ -312,6 +316,43 @@ export default {
       return new Response(JSON.stringify({
         error: 'An error occurred while attempting to store the idea.',
         detail: errorMessage
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+  }
+
+  async function handleAdminData(request, env, corsHeaders) {
+    try {
+      // Optional: Add authentication/authorization here if needed in the future
+      // For now, it's open as per simplicity.
+
+      const sql = "SELECT * FROM project_ideas;";
+      const stmt = env.DB.prepare(sql);
+      const { results, success, error } = await stmt.all();
+
+      if (success && results) {
+        return new Response(JSON.stringify(results), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } else {
+        console.error('Failed to fetch data for admin panel:', error);
+        return new Response(JSON.stringify({
+          success: false,
+          message: 'Failed to fetch data from database.',
+          error: error || 'Unknown D1 error fetching admin data'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    } catch (error) {
+      console.error('Error in handleAdminData function:', error);
+      return new Response(JSON.stringify({
+        error: 'An error occurred while attempting to fetch admin data.',
+        detail: error.message
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

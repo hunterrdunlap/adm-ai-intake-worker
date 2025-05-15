@@ -28,6 +28,10 @@ export default {
       if (url.pathname === '/admin/data' && request.method === 'GET') {
         return handleAdminData(request, env, corsHeaders);
       }
+      
+      if (url.pathname === '/admin/auth' && request.method === 'POST') {
+        return handleAdminAuth(request, env, corsHeaders);
+      }
   
       return new Response(JSON.stringify({ error: "Not found" }), {
         status: 404,
@@ -437,9 +441,4 @@ export default {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-  }
-  
-  // Somewhere in the main fetch function, add this condition
-  if (url.pathname === '/admin/auth' && request.method === 'POST') {
-    return handleAdminAuth(request, env, corsHeaders);
   } 

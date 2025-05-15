@@ -325,13 +325,25 @@ export default {
 
   async function handleAdminData(request, env, corsHeaders) {
     try {
-      // Optional: Add authentication/authorization here if needed in the future
-      // For now, it's open as per simplicity.
-
+      // Parse the URL to check for password parameter
+      const url = new URL(request.url);
+      const password = url.searchParams.get('password');
+      
+      // Check if password is provided and correct
+      // Using an environment variable for security
+      if (!password || password !== env.ADMIN_PASSWORD) {
+        return new Response(JSON.stringify({
+          error: "Unauthorized. Invalid or missing password."
+        }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+  
       const sql = "SELECT * FROM project_ideas;";
       const stmt = env.DB.prepare(sql);
       const { results, success, error } = await stmt.all();
-
+  
       if (success && results) {
         return new Response(JSON.stringify(results), {
           status: 200,
@@ -358,4 +370,4 @@ export default {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-  }
+  } 

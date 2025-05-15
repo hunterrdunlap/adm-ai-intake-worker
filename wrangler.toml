@@ -16,7 +16,7 @@ pattern = "admagent2025.com/store-idea"
 zone_name = "admagent2025.com"
 
 [[routes]]
-pattern = "admagent2025.com/admin/data"
+pattern = "admagent2025.com/admin/data*"
 zone_name = "admagent2025.com"
 
 [[d1_databases]]
@@ -28,3 +28,4 @@ database_id = "8c18f48a-5c7b-4171-8d96-266b09dc2893"
 # OPENAI_KEY will be set as a secret, not directly here.
 # This 'dummy' value here is just a placeholder and won't be used if the secret is set.
 # OPENAI_KEY = "dummy_this_will_be_overridden_by_secret"
+# ADMIN_PASSWORD should be set as a secret, not directly here. 

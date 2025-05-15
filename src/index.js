@@ -326,15 +326,43 @@ export default {
 
   async function handleAdminData(request, env, corsHeaders) {
     try {
-      // Parse the URL to check for password parameter
-      const url = new URL(request.url);
-      const password = url.searchParams.get('password');
+      // Check for Authorization header
+      const authHeader = request.headers.get('Authorization');
       
-      // Check if password is provided and correct
-      // Using an environment variable for security
-      if (!password || password !== env.ADMIN_PASSWORD) {
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return new Response(JSON.stringify({
-          error: "Unauthorized. Invalid or missing password."
+          error: "Unauthorized. Missing or invalid token."
+        }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      // Extract and validate token
+      const token = authHeader.replace('Bearer ', '');
+      
+      try {
+        // In a real app, you'd properly verify the JWT
+        // This is a simple check for demonstration purposes
+        const decoded = atob(token);
+        const [storedPassword, timestamp] = decoded.split(':');
+        
+        // Check if the password in the token matches and if the token is not too old (24 hour expiry)
+        const isValid = 
+          storedPassword === env.ADMIN_PASSWORD && 
+          (Date.now() - parseInt(timestamp)) < 24 * 60 * 60 * 1000;
+        
+        if (!isValid) {
+          return new Response(JSON.stringify({
+            error: "Unauthorized. Token expired or invalid."
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      } catch (e) {
+        return new Response(JSON.stringify({
+          error: "Unauthorized. Invalid token format."
         }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -371,4 +399,47 @@ export default {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+  }
+  
+  // Add the new handleAdminAuth function
+  async function handleAdminAuth(request, env, corsHeaders) {
+    try {
+      // Parse request body
+      const { password } = await request.json();
+      
+      // Check if password is correct
+      if (!password || password !== env.ADMIN_PASSWORD) {
+        return new Response(JSON.stringify({
+          error: "Invalid credentials."
+        }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      // Create a simple token (in a real app, you'd use JWT with proper signing)
+      // This is a basic implementation for demonstration
+      const token = btoa(`${password}:${Date.now()}`);
+      
+      // Return the token
+      return new Response(JSON.stringify({
+        token: token
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    } catch (error) {
+      console.error('Error in handleAdminAuth function:', error);
+      return new Response(JSON.stringify({
+        error: 'Authentication failed.'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+  }
+  
+  // Somewhere in the main fetch function, add this condition
+  if (url.pathname === '/admin/auth' && request.method === 'POST') {
+    return handleAdminAuth(request, env, corsHeaders);
   } 

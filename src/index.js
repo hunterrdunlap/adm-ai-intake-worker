@@ -87,7 +87,8 @@ export default {
   - If multiple questions can be answered from one message, extract all of them with their quality.
   - Focus on the most important unanswered question OR a question that needs clarification due to low quality. If clarifying, be specific about what additional detail is needed.
   - Do NOT acknowledge or repeat what the user just said. Directly ask the next question or ask for clarification concisely.
-  - If the user provides vague answers, assign a lower quality score and politely ask for more specific detail for that question.`;
+  - If the user provides vague answers, assign a lower quality score and politely ask for more specific detail for that question.
+  - For the "What makes this a good candidate for AI?" question (aiCandidacy), be generous with the quality score. Even basic or brief answers should receive at least a 3. Any mention of automation, data processing, pattern recognition, prediction, or similar AI capabilities should be considered more than satisfactory.`;
   
       const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",

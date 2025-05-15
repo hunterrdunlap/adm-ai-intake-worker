@@ -15,6 +15,10 @@ zone_name = "admagent2025.com"
 pattern = "admagent2025.com/store-idea"
 zone_name = "admagent2025.com"
 
+[[routes]]
+pattern = "admagent2025.com/admin/data"
+zone_name = "admagent2025.com"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "adm-ai-ideas-db"
